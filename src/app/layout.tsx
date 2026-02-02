@@ -20,6 +20,13 @@ const jetBrains = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Second Brain",
   description: "Skippy's task tracker + knowledge base",
+  manifest: "/manifest.json",
+  themeColor: "#10b981",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Second Brain",
+  },
 };
 
 export default async function RootLayout({
