@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum SkippyStatus {
+  working
+  idle
+}
+
+enum TaskStatus {
+  backlog
+  in_progress
+  review
+  done
+}
+
+enum TaskPriority {
+  critical
+  high
+  medium
+  low
+}
+
+model Status {
+  id        String       @id @default(cuid())
+  status    SkippyStatus @default(idle)
+  updatedAt DateTime     @updatedAt
+
+  @@map("status")
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus   @default(backlog)
+  priority    TaskPriority @default(medium)
+  tags        String       @default("") // comma-separated
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  activities  TaskActivity[]
+
+  @@index([status])
+  @@index([priority])
+  @@map("tasks")
+}
+
+model TaskActivity {
+  id        String   @id @default(cuid())
+  taskId    String
+  message   String
+  createdAt DateTime @default(now())
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+  @@map("task_activities")
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  category  String   @default("General")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@map("notes")
+}
+
+model Credential {
+  id        String   @id @default(cuid())
+  service   String
+  username  String
+  password  String
+  url       String?  
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([service])
+  @@map("credentials")
+}
+
+model Conversation {
+  id           String   @id @default(cuid())
+  date         DateTime @default(now())
+  participants String   @default("")
+  summary      String
+  keyPoints    String   @default("") // newline-separated
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([date])
+  @@map("conversations")
+}
+
+model WorkingMessage {
+  id        String   @id @default(cuid())
+  author    String   // "Jake" | "Skippy"
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("working_messages")
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  entity    String   // task|note|conversation|vault|status|working
+  entityId  String?
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("activity")
+}
