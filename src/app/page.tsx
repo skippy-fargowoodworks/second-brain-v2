@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { db } from "@/lib/db";
 import { SystemHeader } from "@/components/dashboard/system-header";
 import { StatCard } from "@/components/dashboard/stat-card";
