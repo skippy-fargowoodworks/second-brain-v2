@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { credentialCreateSchema } from "@/lib/zod";
+import { encrypt, decrypt } from "@/lib/crypto";
 
 export async function GET() {
   const entries = await prisma.credential.findMany({ orderBy: { updatedAt: "desc" } });
-  return NextResponse.json(entries);
+  
+  // Decrypt passwords for display
+  const decrypted = entries.map((entry) => ({
+    ...entry,
+    password: decrypt(entry.password),
+  }));
+  
+  return NextResponse.json(decrypted);
 }
 
 export async function POST(req: Request) {
@@ -12,15 +20,16 @@ export async function POST(req: Request) {
   const parsed = credentialCreateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
 
+  // Encrypt password before storing
   const entry = await prisma.credential.create({
     data: {
       service: parsed.data.service,
       username: parsed.data.username,
-      password: parsed.data.password,
+      password: encrypt(parsed.data.password),
       url: parsed.data.url,
       notes: parsed.data.notes,
     },
   });
 
-  return NextResponse.json(entry, { status: 201 });
+  return NextResponse.json({ ...entry, password: "[encrypted]" }, { status: 201 });
 }
