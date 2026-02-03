@@ -123,3 +123,19 @@ model Activity {
   @@index([createdAt])
   @@map("activity")
 }
+
+model Usage {
+  id           String   @id @default(cuid())
+  date         DateTime @default(now())
+  model        String   // e.g., "claude-opus-4-5", "gpt-4.1"
+  provider     String   // e.g., "anthropic", "openai"
+  tokensIn     Int      @default(0)
+  tokensOut    Int      @default(0)
+  cost         Float    @default(0) // in dollars
+  sessionKey   String?  // optional session identifier
+  createdAt    DateTime @default(now())
+
+  @@index([date])
+  @@index([model])
+  @@map("usage")
+}

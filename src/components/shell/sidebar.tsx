@@ -8,6 +8,7 @@ import {
   Lock,
   MessagesSquare,
   Activity,
+  DollarSign,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -18,6 +19,7 @@ const nav = [
   { href: "/notes", label: "Notes", icon: StickyNote },
   { href: "/vault", label: "Vault", icon: Lock },
   { href: "/working-notes", label: "Working Notes", icon: Activity },
+  { href: "/usage", label: "AI Usage", icon: DollarSign },
 ];
 
 export function Sidebar({ status }: { status: "working" | "idle" }) {
