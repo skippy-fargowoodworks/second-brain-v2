@@ -53,11 +53,29 @@ export async function GET(req: NextRequest) {
     return acc;
   }, {} as Record<string, { tokensIn: number; tokensOut: number; cost: number }>);
 
+  const byWeek = records.reduce((acc, r) => {
+    const date = new Date(r.date);
+    const day = date.getDay();
+    const diff = (day + 6) % 7; // shift to Monday
+    const weekStart = new Date(date);
+    weekStart.setDate(date.getDate() - diff);
+    weekStart.setHours(0, 0, 0, 0);
+    const key = weekStart.toISOString().split("T")[0];
+    if (!acc[key]) {
+      acc[key] = { tokensIn: 0, tokensOut: 0, cost: 0 };
+    }
+    acc[key].tokensIn += r.tokensIn;
+    acc[key].tokensOut += r.tokensOut;
+    acc[key].cost += r.cost;
+    return acc;
+  }, {} as Record<string, { tokensIn: number; tokensOut: number; cost: number }>);
+
   return NextResponse.json({
     days,
     totals,
     byModel,
     byDay,
+    byWeek,
     recordCount: records.length,
   });
 }
@@ -70,7 +88,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { model, provider, tokensIn, tokensOut, cost, sessionKey } = body;
+  const { model, provider, tokensIn, tokensOut, cost, sessionKey, task } = body;
 
   if (!model || !provider) {
     return NextResponse.json({ error: "model and provider required" }, { status: 400 });
@@ -78,6 +96,7 @@ export async function POST(req: NextRequest) {
 
   const usage = await db.usage.create({
     data: {
+      task,
       model,
       provider,
       tokensIn: tokensIn || 0,

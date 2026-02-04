@@ -42,13 +42,16 @@ model Task {
   status      TaskStatus   @default(backlog)
   priority    TaskPriority @default(medium)
   tags        String       @default("") // comma-separated
+  projectId   String?      // Optional link to project
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
   activities  TaskActivity[]
+  project     Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([priority])
+  @@index([projectId])
   @@map("tasks")
 }
 
@@ -127,6 +130,7 @@ model Activity {
 model Usage {
   id           String   @id @default(cuid())
   date         DateTime @default(now())
+  task         String?  // short description of what the call was for
   model        String   // e.g., "claude-opus-4-5", "gpt-4.1"
   provider     String   // e.g., "anthropic", "openai"
   tokensIn     Int      @default(0)
@@ -138,4 +142,201 @@ model Usage {
   @@index([date])
   @@index([model])
   @@map("usage")
+}
+
+// ============ NEW FEATURES ============
+
+// Feature 1: Decision Queue
+enum DecisionStatus {
+  pending
+  resolved
+  deferred
+}
+
+model Decision {
+  id          String         @id @default(cuid())
+  title       String
+  description String?
+  context     String?        // Background info for the decision
+  options     String?        // JSON array of options
+  priority    TaskPriority   @default(medium)
+  status      DecisionStatus @default(pending)
+  dueDate     DateTime?
+  resolution  String?        // What was decided
+  resolvedAt  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([status])
+  @@index([priority])
+  @@map("decisions")
+}
+
+// Feature 4: Family Dashboard
+enum FamilyEventType {
+  birthday
+  anniversary
+  event
+}
+
+model FamilyEvent {
+  id        String          @id @default(cuid())
+  name      String          // e.g., "Melissa's Birthday"
+  person    String?         // Person's name if applicable
+  type      FamilyEventType
+  date      DateTime        // The date (year may be ignored for recurring)
+  month     Int             // 1-12 for easy querying
+  day       Int             // 1-31 for easy querying
+  recurring Boolean         @default(true)
+  notes     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([month, day])
+  @@map("family_events")
+}
+
+// Feature 6: Goals/OKR Tracking
+enum GoalStatus {
+  active
+  completed
+  abandoned
+}
+
+model Goal {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  targetDate  DateTime?
+  status      GoalStatus @default(active)
+  progress    Int        @default(0) // 0-100
+  category    String     @default("Business")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  keyResults  KeyResult[]
+
+  @@index([status])
+  @@map("goals")
+}
+
+model KeyResult {
+  id        String   @id @default(cuid())
+  goalId    String
+  title     String
+  target    Float    // Target value
+  current   Float    @default(0) // Current value
+  unit      String   @default("") // e.g., "%", "$", "count"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+  @@map("key_results")
+}
+
+// Feature 7: Recurring Tasks
+enum RecurringSchedule {
+  daily
+  weekly
+  monthly
+}
+
+model RecurringTask {
+  id            String            @id @default(cuid())
+  title         String
+  description   String?
+  priority      TaskPriority      @default(medium)
+  schedule      RecurringSchedule
+  dayOfWeek     Int?              // 0-6 for weekly (0=Sunday)
+  dayOfMonth    Int?              // 1-31 for monthly
+  lastGenerated DateTime?
+  active        Boolean           @default(true)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([active])
+  @@map("recurring_tasks")
+}
+
+// Feature 8: Habit Tracker
+enum HabitFrequency {
+  daily
+  weekly
+}
+
+model Habit {
+  id            String         @id @default(cuid())
+  name          String
+  description   String?
+  frequency     HabitFrequency @default(daily)
+  streak        Int            @default(0)
+  longestStreak Int            @default(0)
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  logs          HabitLog[]
+
+  @@map("habits")
+}
+
+model HabitLog {
+  id        String   @id @default(cuid())
+  habitId   String
+  date      DateTime
+  completed Boolean  @default(true)
+  notes     String?
+  createdAt DateTime @default(now())
+
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  @@unique([habitId, date])
+  @@index([habitId, date])
+  @@map("habit_logs")
+}
+
+// Feature 9: Gratitude/Wins Log
+enum WinCategory {
+  personal
+  business
+  family
+  health
+}
+
+model Win {
+  id        String      @id @default(cuid())
+  content   String
+  category  WinCategory @default(personal)
+  date      DateTime    @default(now())
+  createdAt DateTime    @default(now())
+
+  @@index([date])
+  @@index([category])
+  @@map("wins")
+}
+
+// Feature 10: Project Portfolio
+enum ProjectStatus {
+  active
+  completed
+  on_hold
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  status      ProjectStatus @default(active)
+  priority    TaskPriority  @default(medium)
+  startDate   DateTime      @default(now())
+  targetDate  DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  tasks       Task[]
+
+  @@index([status])
+  @@map("projects")
 }

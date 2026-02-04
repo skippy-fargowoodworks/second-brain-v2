@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { db } from "@/lib/db";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatDistanceToNow } from "date-fns";
+import { addDays, format, formatDistanceToNow, startOfWeek } from "date-fns";
 import { Cpu, DollarSign, ArrowUpDown, Calendar } from "lucide-react";
 
 export default async function UsagePage() {
@@ -53,6 +53,18 @@ export default async function UsagePage() {
     return acc;
   }, {} as Record<string, { tokensIn: number; tokensOut: number; cost: number }>);
 
+  const byWeek = records.reduce((acc, r) => {
+    const weekStart = startOfWeek(r.date, { weekStartsOn: 1 });
+    const key = weekStart.toISOString().split("T")[0];
+    if (!acc[key]) {
+      acc[key] = { tokensIn: 0, tokensOut: 0, cost: 0 };
+    }
+    acc[key].tokensIn += r.tokensIn;
+    acc[key].tokensOut += r.tokensOut;
+    acc[key].cost += r.cost;
+    return acc;
+  }, {} as Record<string, { tokensIn: number; tokensOut: number; cost: number }>);
+
   const formatTokens = (n: number) => {
     if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
     if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
@@ -60,6 +72,12 @@ export default async function UsagePage() {
   };
 
   const formatCost = (n: number) => `$${n.toFixed(2)}`;
+  const formatDayLabel = (day: string) => format(new Date(day), "MMM d");
+  const formatWeekLabel = (weekStart: string) => {
+    const start = new Date(weekStart);
+    const end = addDays(start, 6);
+    return `${format(start, "MMM d")} - ${format(end, "MMM d")}`;
+  };
 
   return (
     <div className="space-y-8">
@@ -158,7 +176,7 @@ export default async function UsagePage() {
             <div className="kicker text-[11px] font-medium text-white/55">DAILY USAGE</div>
             <div className="mt-1 text-sm text-white/45">Last 7 days</div>
           </div>
-          <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             {Object.entries(byDay).length === 0 ? (
               <div className="text-white/45 text-sm">No usage data yet</div>
             ) : (
@@ -170,7 +188,7 @@ export default async function UsagePage() {
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-white/45" />
-                        <span className="text-white/85">{day}</span>
+                        <span className="text-white/85">{formatDayLabel(day)}</span>
                       </div>
                       <Badge className="border-white/10 bg-white/5 text-emerald-400">
                         {formatCost(stats.cost)}
@@ -187,6 +205,37 @@ export default async function UsagePage() {
         </Card>
       </div>
 
+      {/* Weekly Summary */}
+      <Card className="glass rounded-2xl p-5">
+        <div className="mb-4">
+          <div className="kicker text-[11px] font-medium text-white/55">WEEKLY SUMMARY</div>
+          <div className="mt-1 text-sm text-white/45">Totals by week</div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {Object.entries(byWeek).length === 0 ? (
+            <div className="text-white/45 text-sm">No usage data yet</div>
+          ) : (
+            Object.entries(byWeek)
+              .sort((a, b) => b[0].localeCompare(a[0]))
+              .slice(0, 6)
+              .map(([weekStart, stats]) => (
+                <div key={weekStart} className="rounded-xl border border-white/10 bg-slate-950/20 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white/85">{formatWeekLabel(weekStart)}</span>
+                    <Badge className="border-white/10 bg-white/5 text-emerald-400">
+                      {formatCost(stats.cost)}
+                    </Badge>
+                  </div>
+                  <div className="flex gap-4 text-sm text-white/55">
+                    <span>In: {formatTokens(stats.tokensIn)}</span>
+                    <span>Out: {formatTokens(stats.tokensOut)}</span>
+                  </div>
+                </div>
+              ))
+          )}
+        </div>
+      </Card>
+
       {/* Recent Activity */}
       <Card className="glass rounded-2xl p-5">
         <div className="mb-4">
@@ -194,16 +243,35 @@ export default async function UsagePage() {
           <div className="mt-1 text-sm text-white/45">Latest 10 usage records</div>
         </div>
         <div className="space-y-2">
+          <div className="hidden md:grid md:grid-cols-12 text-[11px] uppercase tracking-wide text-white/35 px-3">
+            <div className="md:col-span-4">Task</div>
+            <div className="md:col-span-2">Model</div>
+            <div className="md:col-span-2">Tokens In</div>
+            <div className="md:col-span-2">Tokens Out</div>
+            <div className="md:col-span-1">Cost</div>
+            <div className="md:col-span-1 text-right">When</div>
+          </div>
           {records.slice(0, 10).map((r) => (
-            <div key={r.id} className="rounded-xl border border-white/10 bg-slate-950/20 p-3 flex items-center justify-between">
-              <div>
-                <span className="text-white/85">{r.model}</span>
-                <span className="text-white/45 text-sm ml-2">({r.provider})</span>
-              </div>
-              <div className="flex items-center gap-4 text-sm">
-                <span className="text-white/55">{formatTokens(r.tokensIn + r.tokensOut)} tokens</span>
-                <span className="text-emerald-400">{formatCost(r.cost)}</span>
-                <span className="text-white/35">{formatDistanceToNow(r.date, { addSuffix: true })}</span>
+            <div key={r.id} className="rounded-xl border border-white/10 bg-slate-950/20 p-3">
+              <div className="grid gap-2 md:grid-cols-12 md:items-center">
+                <div className="md:col-span-4">
+                  <div className="text-white/90 font-medium">{r.task || "Unlabeled task"}</div>
+                  <div className="md:hidden text-white/45 text-xs mt-1">
+                    {r.model} ({r.provider})
+                    {r.sessionKey ? ` · ${r.sessionKey}` : ""}
+                  </div>
+                  <div className="hidden md:block text-white/45 text-xs mt-1">
+                    {r.provider}
+                    {r.sessionKey ? ` · ${r.sessionKey}` : ""}
+                  </div>
+                </div>
+                <div className="hidden md:block md:col-span-2 text-white/75">{r.model}</div>
+                <div className="md:col-span-2 text-white/75">{formatTokens(r.tokensIn)}</div>
+                <div className="md:col-span-2 text-white/75">{formatTokens(r.tokensOut)}</div>
+                <div className="md:col-span-1 text-emerald-400">{formatCost(r.cost)}</div>
+                <div className="md:col-span-1 text-white/35 md:text-right">
+                  {formatDistanceToNow(r.date, { addSuffix: true })}
+                </div>
               </div>
             </div>
           ))}
