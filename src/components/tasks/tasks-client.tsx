@@ -30,6 +30,7 @@ type Task = {
   proofWhatItDoes: string | null;
   proofHowToUse: string | null;
   proofTests: string | null;
+  proofScreenshot: string | null;
   subtasks?: Subtask[];
   updatedAt: string;
   createdAt: string;
@@ -106,7 +107,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
   }
 
   function proofCount(t: Task): number {
-    return [t.proofWhatChanged, t.proofWhatItDoes, t.proofHowToUse, t.proofTests]
+    return [t.proofWhatChanged, t.proofWhatItDoes, t.proofHowToUse, t.proofTests, t.proofScreenshot]
       .filter(v => v && v.trim() !== "").length;
   }
 
@@ -263,10 +264,10 @@ function priorityBadge(priority: Task["priority"]) {
 function proofBadge(count: number) {
   const color = count === 0
     ? "bg-red-500/10 text-red-200 border-red-500/20"
-    : count === 4
+    : count === 5
       ? "bg-emerald-500/10 text-emerald-200 border-emerald-500/20"
       : "bg-amber-500/10 text-amber-200 border-amber-500/20";
-  return <Badge className={`border ${color}`}>{count}/4</Badge>;
+  return <Badge className={`border ${color}`}>{count}/5</Badge>;
 }
 
 /* ──────────────── SUBTASKS SECTION ──────────────── */
@@ -360,6 +361,7 @@ function TaskDetailDialog({ task, onSaved, onClose }: { task: Task; onSaved: () 
   const [proofWhatItDoes, setProofWhatItDoes] = React.useState(task.proofWhatItDoes ?? "");
   const [proofHowToUse, setProofHowToUse] = React.useState(task.proofHowToUse ?? "");
   const [proofTests, setProofTests] = React.useState(task.proofTests ?? "");
+  const [proofScreenshot, setProofScreenshot] = React.useState(task.proofScreenshot ?? "");
   const [pending, setPending] = React.useState(false);
 
   async function saveProof() {
@@ -368,7 +370,7 @@ function TaskDetailDialog({ task, onSaved, onClose }: { task: Task; onSaved: () 
       const res = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ proofWhatChanged, proofWhatItDoes, proofHowToUse, proofTests }),
+        body: JSON.stringify({ proofWhatChanged, proofWhatItDoes, proofHowToUse, proofTests, proofScreenshot }),
       });
       if (!res.ok) {
         const error = await res.json();
@@ -384,7 +386,7 @@ function TaskDetailDialog({ task, onSaved, onClose }: { task: Task; onSaved: () 
     }
   }
 
-  const proofCountValue = [proofWhatChanged, proofWhatItDoes, proofHowToUse, proofTests]
+  const proofCountValue = [proofWhatChanged, proofWhatItDoes, proofHowToUse, proofTests, proofScreenshot]
     .filter(v => v && v.trim() !== "").length;
 
   return (
@@ -423,47 +425,67 @@ function TaskDetailDialog({ task, onSaved, onClose }: { task: Task; onSaved: () 
 
       <div>
         <label className="text-sm font-medium text-white/80">What Changed</label>
+        <p className="text-xs text-white/40 mt-0.5 mb-1">Min 50 chars. List every file, endpoint, config, or schema change.</p>
         <Textarea
           value={proofWhatChanged}
           onChange={(e) => setProofWhatChanged(e.target.value)}
-          placeholder="List files modified, endpoints created, configs changed..."
-          className="mt-1 min-h-[80px] rounded-xl border-white/10 bg-white/5"
+          placeholder={"Files modified:\n- server/routes.ts — Added /api/tax/estimate endpoint\n- client/src/pages/shop/ShopCheckout.tsx — Tax display component\n- modules/commerce/server/webhookHandler.ts — Persist tax from Stripe session\n\nNew endpoints:\n- GET /api/tax/estimate — Returns tax estimate for cart\n\nConfig changes:\n- Stripe automatic_tax enabled on checkout sessions"}
+          className="mt-1 min-h-[100px] rounded-xl border-white/10 bg-white/5"
         />
       </div>
 
       <div>
         <label className="text-sm font-medium text-white/80">What It Does</label>
+        <p className="text-xs text-white/40 mt-0.5 mb-1">Min 100 chars. Explain the full feature flow in plain English.</p>
         <Textarea
           value={proofWhatItDoes}
           onChange={(e) => setProofWhatItDoes(e.target.value)}
-          placeholder="Explain the feature in plain English. What does the customer/admin see?"
-          className="mt-1 min-h-[80px] rounded-xl border-white/10 bg-white/5"
+          placeholder={"When a customer adds items to their cart and proceeds to checkout, the system now automatically calculates sales tax based on the shipping address using Stripe Tax.\n\nFlow:\n1. Customer adds items to cart\n2. At checkout, enters shipping address\n3. System calls Stripe Tax API with address + line items\n4. Tax amount displays in the order summary\n5. On payment, webhook persists the tax amount to the order record\n\nAdmin sees: Tax amount on each order in the admin panel\nCustomer sees: Tax line item in checkout before payment"}
+          className="mt-1 min-h-[100px] rounded-xl border-white/10 bg-white/5"
         />
       </div>
 
       <div>
         <label className="text-sm font-medium text-white/80">How to Use It</label>
+        <p className="text-xs text-white/40 mt-0.5 mb-1">Min 100 chars. Must include URLs or step-by-step instructions a human can follow.</p>
         <Textarea
           value={proofHowToUse}
           onChange={(e) => setProofHowToUse(e.target.value)}
-          placeholder="Step-by-step instructions with URLs, buttons, menu paths..."
-          className="mt-1 min-h-[80px] rounded-xl border-white/10 bg-white/5"
+          placeholder={"Step 1: Go to https://fargowoodworks1.com/shop\nStep 2: Click on any product (e.g., Black Walnut Live Edge Bench)\nStep 3: Click 'Add to Cart'\nStep 4: Click 'Checkout' in the cart\nStep 5: Enter a shipping address (e.g., 123 Main St, Fargo ND 58102)\nStep 6: Tax line item appears in the order summary showing calculated tax\nStep 7: Complete payment — tax amount is saved to the order record\n\nAdmin verification:\nStep 1: Go to https://fargowoodworks1.com/admin/orders\nStep 2: Click on the test order\nStep 3: Verify tax amount is displayed in order details"}
+          className="mt-1 min-h-[100px] rounded-xl border-white/10 bg-white/5"
         />
       </div>
 
       <div>
         <label className="text-sm font-medium text-white/80">Tests & Proof</label>
+        <p className="text-xs text-white/40 mt-0.5 mb-1">Min 150 chars. Include at least 3 tests with: exact command/URL, expected result, actual result, PASS/FAIL. Show real output.</p>
         <Textarea
           value={proofTests}
           onChange={(e) => setProofTests(e.target.value)}
-          placeholder="Test commands, expected vs actual results, PASS/FAIL..."
-          className="mt-1 min-h-[80px] rounded-xl border-white/10 bg-white/5"
+          placeholder={"Test 1: Endpoint exists\nCommand: curl -s https://...\nExpected: 200 OK with JSON\nActual: {\"status\":\"ok\"} — 200\nStatus: PASS\n\nTest 2: Error handling\nCommand: curl -s -X POST https://... -d '{}'\nExpected: 400 with validation error\nActual: {\"error\":\"missing fields\"} — 400\nStatus: PASS"}
+          className="mt-1 min-h-[120px] rounded-xl border-white/10 bg-white/5"
         />
       </div>
 
-      {task.status === "done" && proofCountValue < 4 && (
+      <div>
+        <label className="text-sm font-medium text-white/80">Screenshot URL</label>
+        <p className="text-xs text-white/40 mt-0.5 mb-1">Required. URL to screenshot proving the feature works visually (Google Drive, hosted image, etc.)</p>
+        <Input
+          value={proofScreenshot}
+          onChange={(e) => setProofScreenshot(e.target.value)}
+          placeholder="https://drive.google.com/... or https://i.imgur.com/..."
+          className="mt-1 rounded-xl border-white/10 bg-white/5"
+        />
+        {proofScreenshot && proofScreenshot.startsWith("http") && (
+          <div className="mt-2 rounded-lg border border-white/10 overflow-hidden">
+            <img src={proofScreenshot} alt="Proof screenshot" className="max-h-[200px] w-auto" onError={(e) => (e.target as HTMLImageElement).style.display = "none"} />
+          </div>
+        )}
+      </div>
+
+      {task.status === "done" && proofCountValue < 5 && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-          This task is marked done but proof is incomplete ({proofCountValue}/4). Update proof fields to complete documentation.
+          This task is marked done but proof is incomplete ({proofCountValue}/5). All 5 proof fields must be filled with quality documentation.
         </div>
       )}
 

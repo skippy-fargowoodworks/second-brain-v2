@@ -13,6 +13,7 @@ export const taskCreateSchema = z.object({
   proofWhatItDoes: z.string().optional(),
   proofHowToUse: z.string().optional(),
   proofTests: z.string().optional(),
+  proofScreenshot: z.string().optional(),
   dueDate: z.string().datetime().optional().nullable(),
 });
 

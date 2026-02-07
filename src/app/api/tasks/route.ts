@@ -37,6 +37,7 @@ export async function POST(req: Request) {
       proofWhatItDoes: parsed.data.proofWhatItDoes,
       proofHowToUse: parsed.data.proofHowToUse,
       proofTests: parsed.data.proofTests,
+      proofScreenshot: parsed.data.proofScreenshot,
       dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate) : undefined,
       activities: { create: [{ message: "Task created" }] },
     },

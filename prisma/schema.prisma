@@ -46,6 +46,7 @@ model Task {
   proofWhatItDoes  String?   @map("proof_what_it_does")
   proofHowToUse    String?   @map("proof_how_to_use")
   proofTests       String?   @map("proof_tests")
+  proofScreenshot  String?   @map("proof_screenshot") // URL to screenshot proving the feature works
   dueDate     DateTime?    @map("due_date")
   projectId   String?      // Optional link to project
   createdAt   DateTime     @default(now())

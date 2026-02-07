@@ -21,27 +21,100 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const parsed = taskCreateSchema.partial().safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
 
-  // Proof enforcement: if marking as done, all 4 proof fields must be filled
+  // Proof enforcement: if marking as done, ALL 5 proof fields must meet quality standards
   if (parsed.data.status === "done") {
     const existing = await db.task.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const mergedProof = {
-      proofWhatChanged: parsed.data.proofWhatChanged ?? existing.proofWhatChanged,
-      proofWhatItDoes: parsed.data.proofWhatItDoes ?? existing.proofWhatItDoes,
-      proofHowToUse: parsed.data.proofHowToUse ?? existing.proofHowToUse,
-      proofTests: parsed.data.proofTests ?? existing.proofTests,
+    const merged = {
+      proofWhatChanged: (parsed.data.proofWhatChanged ?? existing.proofWhatChanged ?? "").trim(),
+      proofWhatItDoes: (parsed.data.proofWhatItDoes ?? existing.proofWhatItDoes ?? "").trim(),
+      proofHowToUse: (parsed.data.proofHowToUse ?? existing.proofHowToUse ?? "").trim(),
+      proofTests: (parsed.data.proofTests ?? existing.proofTests ?? "").trim(),
+      proofScreenshot: (parsed.data.proofScreenshot ?? existing.proofScreenshot ?? "").trim(),
     };
 
-    const missing: string[] = [];
-    if (!mergedProof.proofWhatChanged) missing.push("proofWhatChanged");
-    if (!mergedProof.proofWhatItDoes) missing.push("proofWhatItDoes");
-    if (!mergedProof.proofHowToUse) missing.push("proofHowToUse");
-    if (!mergedProof.proofTests) missing.push("proofTests");
+    // Quality requirements per field
+    const requirements: { field: string; label: string; minLength: number; mustContain?: string[]; hint: string }[] = [
+      {
+        field: "proofWhatChanged",
+        label: "What Changed",
+        minLength: 50,
+        hint: "List specific files modified, endpoints created, or configs changed. Example: 'server/routes.ts — Added /api/tax/estimate endpoint'"
+      },
+      {
+        field: "proofWhatItDoes",
+        label: "What It Does",
+        minLength: 100,
+        hint: "Explain the feature in plain English. Describe the full flow: what the customer sees, what happens behind the scenes, step by step."
+      },
+      {
+        field: "proofHowToUse",
+        label: "How to Use It",
+        minLength: 100,
+        mustContain: ["/", "http", "step", "click", "go to", "navigate", "visit", "open", "1.", "1)"],
+        hint: "Provide step-by-step instructions with exact URLs, menu paths, and button names. A human must be able to follow these and use the feature."
+      },
+      {
+        field: "proofTests",
+        label: "Tests & Proof",
+        minLength: 150,
+        mustContain: ["PASS", "FAIL", "curl", "http", "200", "result", "response", "actual", "expected", "test"],
+        hint: "Include at least 3 tests with: exact command/URL, expected result, actual result, and PASS/FAIL verdict. Show real output, not summaries."
+      },
+      {
+        field: "proofScreenshot",
+        label: "Screenshot",
+        minLength: 10,
+        hint: "Provide a URL to a screenshot proving the feature works (e.g., hosted image URL, Google Drive link, or file path)."
+      },
+    ];
 
-    if (missing.length > 0) {
+    const failures: { field: string; label: string; reason: string; hint: string }[] = [];
+
+    for (const req of requirements) {
+      const value = merged[req.field as keyof typeof merged];
+
+      if (!value || value.length === 0) {
+        failures.push({ field: req.field, label: req.label, reason: "Missing — field is empty", hint: req.hint });
+        continue;
+      }
+
+      if (value.length < req.minLength) {
+        failures.push({
+          field: req.field,
+          label: req.label,
+          reason: `Too short (${value.length} chars, minimum ${req.minLength}). This looks like a low-effort placeholder, not real documentation.`,
+          hint: req.hint
+        });
+        continue;
+      }
+
+      if (req.mustContain) {
+        const lower = value.toLowerCase();
+        const hasAny = req.mustContain.some(kw => lower.includes(kw.toLowerCase()));
+        if (!hasAny) {
+          failures.push({
+            field: req.field,
+            label: req.label,
+            reason: `Content doesn't look like real ${req.label.toLowerCase()}. Expected keywords like: ${req.mustContain.slice(0, 5).join(", ")}`,
+            hint: req.hint
+          });
+        }
+      }
+    }
+
+    if (failures.length > 0) {
       return NextResponse.json(
-        { error: "Cannot mark task done without proof", missing },
+        {
+          error: "Cannot mark task done — proof documentation is incomplete or low quality",
+          failures: failures.map(f => ({
+            field: f.field,
+            label: f.label,
+            reason: f.reason,
+            hint: f.hint,
+          })),
+        },
         { status: 400 }
       );
     }
@@ -60,6 +133,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       proofWhatItDoes: parsed.data.proofWhatItDoes,
       proofHowToUse: parsed.data.proofHowToUse,
       proofTests: parsed.data.proofTests,
+      proofScreenshot: parsed.data.proofScreenshot,
       dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate) : undefined,
       activities: { create: [{ message: "Task updated" }] },
     },
