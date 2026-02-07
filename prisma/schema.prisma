@@ -42,17 +42,39 @@ model Task {
   status      TaskStatus   @default(backlog)
   priority    TaskPriority @default(medium)
   tags        String       @default("") // comma-separated
+  proofWhatChanged String?   @map("proof_what_changed")
+  proofWhatItDoes  String?   @map("proof_what_it_does")
+  proofHowToUse    String?   @map("proof_how_to_use")
+  proofTests       String?   @map("proof_tests")
+  dueDate     DateTime?    @map("due_date")
   projectId   String?      // Optional link to project
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
   activities  TaskActivity[]
+  subtasks    Subtask[]
   project     Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([priority])
   @@index([projectId])
+  @@index([dueDate])
   @@map("tasks")
+}
+
+model Subtask {
+  id        String   @id @default(cuid())
+  taskId    String
+  title     String
+  done      Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, sortOrder])
+  @@map("subtasks")
 }
 
 model TaskActivity {

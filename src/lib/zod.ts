@@ -8,6 +8,18 @@ export const taskCreateSchema = z.object({
   status: z.enum(["backlog", "in_progress", "review", "done"]).optional(),
   priority: z.enum(["critical", "high", "medium", "low"]).optional(),
   tags: z.string().optional(),
+  projectId: z.string().optional(),
+  proofWhatChanged: z.string().optional(),
+  proofWhatItDoes: z.string().optional(),
+  proofHowToUse: z.string().optional(),
+  proofTests: z.string().optional(),
+  dueDate: z.string().datetime().optional().nullable(),
+});
+
+export const subtaskCreateSchema = z.object({
+  title: z.string().min(1),
+  done: z.boolean().optional(),
+  sortOrder: z.number().optional(),
 });
 
 export const noteCreateSchema = z.object({

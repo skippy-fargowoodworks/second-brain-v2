@@ -9,16 +9,34 @@ import {
   MessagesSquare,
   Activity,
   DollarSign,
+  HelpCircle,
+  Search,
+  Heart,
+  FileText,
+  Target,
+  Repeat,
+  Check,
+  Trophy,
+  FolderKanban,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const nav = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tasks", label: "Tasks", icon: ListTodo },
+  { href: "/projects", label: "Projects", icon: FolderKanban },
+  { href: "/decisions", label: "Decisions", icon: HelpCircle },
+  { href: "/goals", label: "Goals", icon: Target },
+  { href: "/habits", label: "Habits", icon: Check },
+  { href: "/wins", label: "Wins", icon: Trophy },
+  { href: "/family", label: "Family", icon: Heart },
+  { href: "/recurring", label: "Recurring", icon: Repeat },
   { href: "/conversations", label: "Conversations", icon: MessagesSquare },
   { href: "/notes", label: "Notes", icon: StickyNote },
   { href: "/vault", label: "Vault", icon: Lock },
   { href: "/working-notes", label: "Working Notes", icon: Activity },
+  { href: "/search", label: "Search", icon: Search },
+  { href: "/report", label: "Report", icon: FileText },
   { href: "/usage", label: "AI Usage", icon: DollarSign },
 ];
 
