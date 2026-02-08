@@ -21,10 +21,25 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const parsed = taskCreateSchema.partial().safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
 
-  // Proof enforcement: if marking as done, ALL 5 proof fields must meet quality standards
+  // Proof enforcement: if marking as done, ALL 5 proof fields must meet quality standards AND all subtasks must be complete
   if (parsed.data.status === "done") {
-    const existing = await db.task.findUnique({ where: { id } });
+    const existing = await db.task.findUnique({ where: { id }, include: { subtasks: true } });
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    // Subtask completion check
+    const subtasks = existing.subtasks ?? [];
+    if (subtasks.length > 0) {
+      const incomplete = subtasks.filter(s => !s.done);
+      if (incomplete.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Cannot mark task done — ${incomplete.length} of ${subtasks.length} subtasks are incomplete`,
+            incompleteSubtasks: incomplete.map(s => s.title),
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     const merged = {
       proofWhatChanged: (parsed.data.proofWhatChanged ?? existing.proofWhatChanged ?? "").trim(),

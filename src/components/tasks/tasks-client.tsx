@@ -15,6 +15,7 @@ type Subtask = {
   id: string;
   title: string;
   done: boolean;
+  notes: string | null;
   sortOrder: number;
 };
 
@@ -383,6 +384,8 @@ function proofBadge(count: number) {
 function SubtasksSection({ taskId, initialSubtasks }: { taskId: string; initialSubtasks: Subtask[] }) {
   const [subtasks, setSubtasks] = React.useState<Subtask[]>(initialSubtasks);
   const [newTitle, setNewTitle] = React.useState("");
+  const [editingNotes, setEditingNotes] = React.useState<string | null>(null);
+  const [notesValue, setNotesValue] = React.useState("");
 
   async function addSubtask() {
     if (!newTitle.trim()) return;
@@ -409,6 +412,19 @@ function SubtasksSection({ taskId, initialSubtasks }: { taskId: string; initialS
     }
   }
 
+  async function saveNotes(subId: string) {
+    const res = await fetch(`/api/tasks/${taskId}/subtasks`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ subtaskId: subId, notes: notesValue }),
+    });
+    if (res.ok) {
+      setSubtasks(subtasks.map(s => s.id === subId ? { ...s, notes: notesValue } : s));
+      setEditingNotes(null);
+      toast("Subtask notes saved");
+    }
+  }
+
   async function removeSubtask(subId: string) {
     const res = await fetch(`/api/tasks/${taskId}/subtasks?subtaskId=${subId}`, { method: "DELETE" });
     if (res.ok) {
@@ -417,31 +433,73 @@ function SubtasksSection({ taskId, initialSubtasks }: { taskId: string; initialS
   }
 
   const done = subtasks.filter(s => s.done).length;
+  const allDone = subtasks.length > 0 && done === subtasks.length;
 
   return (
     <div>
       <div className="flex items-center gap-2 mb-2">
         <label className="text-sm font-medium text-white/80">Subtasks</label>
         {subtasks.length > 0 && (
-          <span className="text-xs text-white/50">{done}/{subtasks.length} complete</span>
+          <Badge className={`border text-xs ${allDone ? "bg-emerald-500/10 text-emerald-200 border-emerald-500/20" : "bg-amber-500/10 text-amber-200 border-amber-500/20"}`}>
+            {done}/{subtasks.length} complete
+          </Badge>
         )}
       </div>
+      {subtasks.length > 0 && !allDone && (
+        <p className="text-xs text-amber-400/80 mb-2">All subtasks must be completed before this task can be marked done.</p>
+      )}
 
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         {subtasks.map((sub) => (
-          <div key={sub.id} className="flex items-center gap-2 group rounded-lg px-2 py-1.5 hover:bg-white/5">
-            <button onClick={() => toggleSubtask(sub)} className="shrink-0 text-white/70 hover:text-white">
-              {sub.done ? <CheckSquare className="h-4 w-4 text-emerald-400" /> : <Square className="h-4 w-4" />}
-            </button>
-            <span className={`flex-1 text-sm ${sub.done ? "line-through text-white/40" : "text-white/80"}`}>
-              {sub.title}
-            </span>
-            <button
-              onClick={() => removeSubtask(sub.id)}
-              className="shrink-0 opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition-opacity"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
+          <div key={sub.id} className="group rounded-lg px-2 py-1.5 hover:bg-white/5">
+            <div className="flex items-center gap-2">
+              <button onClick={() => toggleSubtask(sub)} className="shrink-0 text-white/70 hover:text-white">
+                {sub.done ? <CheckSquare className="h-4 w-4 text-emerald-400" /> : <Square className="h-4 w-4" />}
+              </button>
+              <span className={`flex-1 text-sm ${sub.done ? "line-through text-white/40" : "text-white/80"}`}>
+                {sub.title}
+              </span>
+              <button
+                onClick={() => {
+                  if (editingNotes === sub.id) { setEditingNotes(null); }
+                  else { setEditingNotes(sub.id); setNotesValue(sub.notes ?? ""); }
+                }}
+                className={`shrink-0 text-xs px-1.5 py-0.5 rounded transition-colors ${editingNotes === sub.id ? "bg-blue-500/20 text-blue-300" : "opacity-0 group-hover:opacity-100 text-white/30 hover:text-white/60"}`}
+              >
+                {sub.notes ? "notes" : "+ notes"}
+              </button>
+              <button
+                onClick={() => removeSubtask(sub.id)}
+                className="shrink-0 opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition-opacity"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {/* Show existing notes inline */}
+            {sub.notes && editingNotes !== sub.id && (
+              <div className="ml-6 mt-1 text-xs text-white/40 whitespace-pre-wrap border-l-2 border-white/10 pl-2">
+                {sub.notes}
+              </div>
+            )}
+            {/* Notes editor */}
+            {editingNotes === sub.id && (
+              <div className="ml-6 mt-2 space-y-1">
+                <Textarea
+                  value={notesValue}
+                  onChange={(e) => setNotesValue(e.target.value)}
+                  placeholder="Add proof/verification notes for this subtask..."
+                  className="min-h-[60px] text-xs rounded-lg border-white/10 bg-white/5"
+                />
+                <div className="flex gap-1">
+                  <Button size="sm" className="h-6 text-xs rounded-md bg-blue-500/50 hover:bg-blue-500" onClick={() => saveNotes(sub.id)}>
+                    Save
+                  </Button>
+                  <Button size="sm" variant="secondary" className="h-6 text-xs rounded-md bg-white/5 hover:bg-white/10" onClick={() => setEditingNotes(null)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>

@@ -38,11 +38,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   if (!subtaskId) return NextResponse.json({ error: "subtaskId required" }, { status: 400 });
 
+  const { notes } = body as { subtaskId?: string; done?: boolean; title?: string; notes?: string };
+
   const updated = await db.subtask.update({
     where: { id: subtaskId },
     data: {
       ...(done !== undefined ? { done } : {}),
       ...(title !== undefined ? { title } : {}),
+      ...(notes !== undefined ? { notes } : {}),
     },
   });
 
