@@ -49,8 +49,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       proofScreenshot: (parsed.data.proofScreenshot ?? existing.proofScreenshot ?? "").trim(),
     };
 
-    // Quality requirements per field
-    const requirements: { field: string; label: string; minLength: number; mustContain?: string[]; hint: string }[] = [
+    // Quality requirements per field — STRICT ENFORCEMENT (Jake directive Feb 7 2026)
+    // "Replit Agent said it works" is NOT proof. Must have independent production verification.
+    const requirements: { field: string; label: string; minLength: number; mustContain?: string[]; mustContainAll?: string[]; hint: string }[] = [
       {
         field: "proofWhatChanged",
         label: "What Changed",
@@ -73,15 +74,18 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       {
         field: "proofTests",
         label: "Tests & Proof",
-        minLength: 150,
-        mustContain: ["PASS", "FAIL", "curl", "http", "200", "result", "response", "actual", "expected", "test"],
-        hint: "Include at least 3 tests with: exact command/URL, expected result, actual result, and PASS/FAIL verdict. Show real output, not summaries."
+        minLength: 200,
+        // Must contain ALL of these — proves real production testing, not agent self-reports
+        mustContainAll: ["fargowoodworks1.com", "PASS"],
+        mustContain: ["curl", "HTTP", "200", "actual", "expected"],
+        hint: "Must include real production tests against fargowoodworks1.com with actual curl output, HTTP status codes, and PASS/FAIL. 'Replit Agent said it works' is NOT proof."
       },
       {
         field: "proofScreenshot",
-        label: "Screenshot",
+        label: "Screenshot / Evidence URL",
         minLength: 10,
-        hint: "Provide a URL to a screenshot proving the feature works (e.g., hosted image URL, Google Drive link, or file path)."
+        mustContain: ["http", "/Users/", "screenshot", "png", "jpg", "drive.google", "imgur"],
+        hint: "Provide an actual URL or file path to a screenshot. Not a description — an actual link to visual evidence."
       },
     ];
 
@@ -113,6 +117,20 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
             field: req.field,
             label: req.label,
             reason: `Content doesn't look like real ${req.label.toLowerCase()}. Expected keywords like: ${req.mustContain.slice(0, 5).join(", ")}`,
+            hint: req.hint
+          });
+        }
+      }
+
+      // STRICT: mustContainAll — ALL keywords must be present (proves real production testing)
+      if (req.mustContainAll) {
+        const lower = value.toLowerCase();
+        const missing = req.mustContainAll.filter(kw => !lower.includes(kw.toLowerCase()));
+        if (missing.length > 0) {
+          failures.push({
+            field: req.field,
+            label: req.label,
+            reason: `Missing required evidence: ${missing.join(", ")}. Proof must include real production test results from fargowoodworks1.com with PASS/FAIL verdicts — not Replit Agent self-reports.`,
             hint: req.hint
           });
         }
