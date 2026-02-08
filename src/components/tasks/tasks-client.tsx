@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Pencil, ListTodo, Check, Square, CheckSquare, X } from "lucide-react";
+import { Plus, Trash2, Pencil, ListTodo, Check, Square, CheckSquare, X, ChevronRight, ChevronDown, Upload, ZoomIn } from "lucide-react";
 
 type Subtask = {
   id: string;
@@ -91,6 +91,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
   const [open, setOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Task | null>(null);
   const [detailTask, setDetailTask] = React.useState<Task | null>(null);
+  const [lightboxSrc, setLightboxSrc] = React.useState<string | null>(null);
 
   async function refresh() {
     const res = await fetch("/api/tasks", { cache: "no-store" });
@@ -109,6 +110,32 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
   function proofCount(t: Task): number {
     return [t.proofWhatChanged, t.proofWhatItDoes, t.proofHowToUse, t.proofTests, t.proofScreenshot]
       .filter(v => v && v.trim() !== "").length;
+  }
+
+  const [expandedTasks, setExpandedTasks] = React.useState<Set<string>>(new Set());
+
+  function toggleExpand(taskId: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setExpandedTasks(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  }
+
+  function subtaskProgress(t: Task): { done: number; total: number } {
+    const subs = t.subtasks ?? [];
+    return { done: subs.filter(s => s.done).length, total: subs.length };
+  }
+
+  async function toggleSubtaskInline(taskId: string, sub: Subtask) {
+    const res = await fetch(`/api/tasks/${taskId}/subtasks`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ subtaskId: sub.id, done: !sub.done }),
+    });
+    if (res.ok) await refresh();
   }
 
   return (
@@ -156,9 +183,11 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
             <Table>
               <TableHeader>
                 <TableRow className="border-white/10">
+                  <TableHead className="text-white/60 w-8"></TableHead>
                   <TableHead className="text-white/60">Title</TableHead>
                   <TableHead className="text-white/60">Status</TableHead>
                   <TableHead className="text-white/60">Priority</TableHead>
+                  <TableHead className="text-white/60">Subtasks</TableHead>
                   <TableHead className="text-white/60">Proof</TableHead>
                   <TableHead className="text-white/60">Due</TableHead>
                   <TableHead className="text-white/60">Updated</TableHead>
@@ -166,48 +195,109 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tasks.map((t) => (
-                  <TableRow key={t.id} className="border-white/10 cursor-pointer hover:bg-white/5" onClick={() => setDetailTask(t)}>
-                    <TableCell className="font-medium text-white/90 max-w-[300px] truncate">{t.title}</TableCell>
-                    <TableCell>{statusBadge(t.status)}</TableCell>
-                    <TableCell>{priorityBadge(t.priority)}</TableCell>
-                    <TableCell>{proofBadge(proofCount(t))}</TableCell>
-                    <TableCell>
-                      <span className={`text-sm ${isDueOverdue(t.dueDate) ? "text-red-400 font-medium" : isDueSoon(t.dueDate) ? "text-amber-400" : "text-white/50"}`}>
-                        {formatDueDate(t.dueDate)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-white/50">{formatDate(t.updatedAt)}</span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="inline-flex gap-2" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          size="icon"
-                          variant="secondary"
-                          className="h-9 w-9 rounded-xl bg-white/5 hover:bg-white/10"
-                          onClick={() => {
-                            setEditing(t);
-                            setOpen(true);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="secondary"
-                          className="h-9 w-9 rounded-xl bg-white/5 hover:bg-white/10"
-                          onClick={() => remove(t.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {tasks.map((t) => {
+                  const { done: subDone, total: subTotal } = subtaskProgress(t);
+                  const isExpanded = expandedTasks.has(t.id);
+                  const hasSubtasks = subTotal > 0;
+                  const subPercent = subTotal > 0 ? Math.round((subDone / subTotal) * 100) : 0;
+
+                  return (
+                    <React.Fragment key={t.id}>
+                      <TableRow className="border-white/10 cursor-pointer hover:bg-white/5" onClick={() => setDetailTask(t)}>
+                        {/* Expand toggle */}
+                        <TableCell className="w-8 px-2">
+                          {hasSubtasks ? (
+                            <button
+                              onClick={(e) => toggleExpand(t.id, e)}
+                              className="p-1 rounded hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+                            >
+                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </button>
+                          ) : (
+                            <span className="w-4 h-4 block" />
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium text-white/90 max-w-[300px] truncate">{t.title}</TableCell>
+                        <TableCell>{statusBadge(t.status)}</TableCell>
+                        <TableCell>{priorityBadge(t.priority)}</TableCell>
+                        {/* Subtask progress */}
+                        <TableCell>
+                          {hasSubtasks ? (
+                            <div className="flex items-center gap-2 min-w-[90px]">
+                              <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden min-w-[40px]">
+                                <div
+                                  className={`h-full rounded-full transition-all ${subPercent === 100 ? "bg-emerald-400" : subPercent > 50 ? "bg-blue-400" : subPercent > 0 ? "bg-amber-400" : "bg-white/20"}`}
+                                  style={{ width: `${subPercent}%` }}
+                                />
+                              </div>
+                              <span className={`text-xs font-medium whitespace-nowrap ${subPercent === 100 ? "text-emerald-400" : "text-white/50"}`}>
+                                {subDone}/{subTotal}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-white/30">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>{proofBadge(proofCount(t))}</TableCell>
+                        <TableCell>
+                          <span className={`text-sm ${isDueOverdue(t.dueDate) ? "text-red-400 font-medium" : isDueSoon(t.dueDate) ? "text-amber-400" : "text-white/50"}`}>
+                            {formatDueDate(t.dueDate)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-white/50">{formatDate(t.updatedAt)}</span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="inline-flex gap-2" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              size="icon"
+                              variant="secondary"
+                              className="h-9 w-9 rounded-xl bg-white/5 hover:bg-white/10"
+                              onClick={() => {
+                                setEditing(t);
+                                setOpen(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="secondary"
+                              className="h-9 w-9 rounded-xl bg-white/5 hover:bg-white/10"
+                              onClick={() => remove(t.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+
+                      {/* Expanded subtask rows */}
+                      {isExpanded && hasSubtasks && (t.subtasks ?? []).map((sub) => (
+                        <TableRow key={sub.id} className="border-white/5 bg-white/[0.02]">
+                          <TableCell className="w-8 px-2" />
+                          <TableCell colSpan={7} className="py-1.5">
+                            <div className="flex items-center gap-2 pl-4">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleSubtaskInline(t.id, sub); }}
+                                className="shrink-0 text-white/70 hover:text-white"
+                              >
+                                {sub.done ? <CheckSquare className="h-4 w-4 text-emerald-400" /> : <Square className="h-4 w-4" />}
+                              </button>
+                              <span className={`text-sm ${sub.done ? "line-through text-white/35" : "text-white/65"}`}>
+                                {sub.title}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell />
+                        </TableRow>
+                      ))}
+                    </React.Fragment>
+                  );
+                })}
                 {tasks.length === 0 && (
                   <TableRow className="border-white/10">
-                    <TableCell colSpan={7} className="py-10 text-center text-sm text-white/45">
+                    <TableCell colSpan={9} className="py-10 text-center text-sm text-white/45">
                       No tasks yet.
                     </TableCell>
                   </TableRow>
@@ -236,6 +326,24 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
             </div>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Lightbox for full-size screenshot viewing */}
+      {lightboxSrc && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-8 cursor-pointer"
+          onClick={() => setLightboxSrc(null)}
+        >
+          <div className="relative max-w-full max-h-full">
+            <img src={lightboxSrc} alt="Screenshot full view" className="max-w-full max-h-[90vh] rounded-xl shadow-2xl" />
+            <button
+              className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-2 hover:bg-black/80"
+              onClick={() => setLightboxSrc(null)}
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
       )}
     </>
   );
@@ -467,21 +575,7 @@ function TaskDetailDialog({ task, onSaved, onClose }: { task: Task; onSaved: () 
         />
       </div>
 
-      <div>
-        <label className="text-sm font-medium text-white/80">Screenshot URL</label>
-        <p className="text-xs text-white/40 mt-0.5 mb-1">Required. URL to screenshot proving the feature works visually (Google Drive, hosted image, etc.)</p>
-        <Input
-          value={proofScreenshot}
-          onChange={(e) => setProofScreenshot(e.target.value)}
-          placeholder="https://drive.google.com/... or https://i.imgur.com/..."
-          className="mt-1 rounded-xl border-white/10 bg-white/5"
-        />
-        {proofScreenshot && proofScreenshot.startsWith("http") && (
-          <div className="mt-2 rounded-lg border border-white/10 overflow-hidden">
-            <img src={proofScreenshot} alt="Proof screenshot" className="max-h-[200px] w-auto" onError={(e) => (e.target as HTMLImageElement).style.display = "none"} />
-          </div>
-        )}
-      </div>
+      <ScreenshotUpload value={proofScreenshot} onChange={setProofScreenshot} />
 
       {task.status === "done" && proofCountValue < 5 && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
@@ -497,6 +591,144 @@ function TaskDetailDialog({ task, onSaved, onClose }: { task: Task; onSaved: () 
           Save Proof
         </Button>
       </div>
+    </div>
+  );
+}
+
+/* ──────────────── SCREENSHOT UPLOAD ──────────────── */
+
+function ScreenshotUpload({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = React.useState(false);
+  const [lightbox, setLightbox] = React.useState(false);
+
+  function handleFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image must be under 10MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      onChange(result); // base64 data URL
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  }
+
+  function handlePaste(e: React.ClipboardEvent) {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith("image/")) {
+        const file = items[i].getAsFile();
+        if (file) handleFile(file);
+        e.preventDefault();
+        return;
+      }
+    }
+  }
+
+  const hasImage = value && (value.startsWith("data:image/") || value.startsWith("http"));
+
+  return (
+    <div>
+      <label className="text-sm font-medium text-white/80">Screenshot</label>
+      <p className="text-xs text-white/40 mt-0.5 mb-2">Required. Upload, paste, or drag an image proving the feature works.</p>
+
+      {hasImage ? (
+        <div className="space-y-2">
+          {/* Thumbnail */}
+          <div className="relative group inline-block">
+            <img
+              src={value}
+              alt="Proof screenshot"
+              className="h-32 w-auto rounded-xl border border-white/10 object-cover cursor-pointer hover:border-white/30 transition-colors"
+              onClick={() => setLightbox(true)}
+              onError={(e) => (e.target as HTMLImageElement).style.display = "none"}
+            />
+            <div
+              className="absolute inset-0 rounded-xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+              onClick={() => setLightbox(true)}
+            >
+              <ZoomIn className="h-6 w-6 text-white" />
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 text-xs rounded-lg bg-white/10 hover:bg-white/20"
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload className="h-3 w-3 mr-1" /> Replace
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 text-xs rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300"
+              onClick={() => onChange("")}
+            >
+              <X className="h-3 w-3 mr-1" /> Remove
+            </Button>
+          </div>
+
+          {/* Lightbox */}
+          {lightbox && (
+            <div
+              className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-8 cursor-pointer"
+              onClick={() => setLightbox(false)}
+            >
+              <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
+                <img src={value} alt="Screenshot full view" className="max-w-full max-h-[90vh] rounded-xl shadow-2xl" />
+                <button
+                  className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-2 hover:bg-black/80"
+                  onClick={() => setLightbox(false)}
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div
+          className={`rounded-xl border-2 border-dashed p-6 text-center transition-colors cursor-pointer ${dragOver ? "border-blue-400 bg-blue-500/10" : "border-white/15 hover:border-white/30 bg-white/[0.02]"}`}
+          onClick={() => fileRef.current?.click()}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          onPaste={handlePaste}
+          tabIndex={0}
+        >
+          <Upload className="h-8 w-8 mx-auto text-white/30 mb-2" />
+          <p className="text-sm text-white/50">Drop an image here, click to upload, or paste from clipboard</p>
+          <p className="text-xs text-white/30 mt-1">PNG, JPG, GIF up to 10MB</p>
+        </div>
+      )}
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFile(file);
+          e.target.value = ""; // reset to allow re-selecting same file
+        }}
+      />
     </div>
   );
 }
